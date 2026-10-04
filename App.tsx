@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, SafeAreaView, View, Text } from 'react-native';
+import { ScrollView, StyleSheet, View, Text, SafeAreaView, Platform } from 'react-native';
 import { registerRootComponent } from 'expo';
 import { ParentTaskForm } from './src/components/ParentTaskForm';
 import ChildTaskCard from './src/components/ChildTaskCard';
@@ -31,16 +31,19 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    minHeight: '100vh' as any, // Forces full viewport height on Web
     backgroundColor: '#f5f5f5',
   },
   scroll: {
     padding: 20,
+    flexGrow: 1,
   },
   header: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#333',
   },
   spacer: {
     height: 20,
