@@ -21,6 +21,7 @@ import {
   CircularTimer, LiveRemaining, TaskPlayButton, TimerControls, TimerStatus, getTaskTimer, removeTaskTimer,
   syncTaskTimerDuration, useTimerStatus,
 } from './countdownTimer';
+import { TaskBreakdown, progressLabel } from './taskBreakdown';
 
 /* ============================== Task store ============================== */
 
@@ -48,7 +49,8 @@ function seedTasks(): Task[] {
     {
       id: 't4', title: 'Clean room', description: 'Put toys away and make the bed.',
       category: 'home', icon: 'broom', tileColor: '#FCF1BD', date: today, time: '17:00', duration: 15, repeat: 'none',
-      assignee: 'Alex', reminder: 'At task time', completed: false, steps: [],
+      assignee: 'Alex', reminder: 'At task time', completed: false,
+      steps: [{ text: 'Pick up clothes', done: true }, { text: 'Make bed', done: true }, { text: 'Put books away', done: false }],
     },
     {
       id: 't5', title: 'Read for 20 minutes', description: 'Pick a favorite book and read.',
@@ -114,7 +116,8 @@ type Route =
   | { name: 'create' }
   | { name: 'details'; id: string }
   | { name: 'timer'; id: string }
-  | { name: 'edit'; id: string };
+  | { name: 'edit'; id: string }
+  | { name: 'breakdown'; id: string };
 
 interface Nav {
   push(route: Route): void;
@@ -171,6 +174,7 @@ export default function App() {
         {route.name === 'details' && <TaskDetailsScreen key={key} nav={nav} id={route.id} />}
         {route.name === 'timer' && <ActiveTimerScreen key={key} nav={nav} id={route.id} />}
         {route.name === 'edit' && <EditTaskScreen key={key} nav={nav} id={route.id} />}
+        {route.name === 'breakdown' && <TaskBreakdownScreen key={key} nav={nav} id={route.id} />}
       </View>
     </SafeAreaProvider>
   );
@@ -488,6 +492,7 @@ function TaskDetailsScreen({ nav, id }: TaskScreenProps) {
   const toggleStep = (index: number): void => {
     updateTask(task.id, { steps: task.steps.map((st, i) => (i === index ? { ...st, done: !st.done } : st)) });
   };
+  const openBreakdown = (): void => nav.push({ name: 'breakdown', id: task.id });
 
   return (
     <Screen>
@@ -530,21 +535,24 @@ function TaskDetailsScreen({ nav, id }: TaskScreenProps) {
           </View>
         </View>
 
-        {task.steps.length ? (
-          <>
-            <Txt w={700} size={14} style={s.groupTitle}>Steps</Txt>
-            <View style={s.stepsCard}>
-              {task.steps.map((st, i) => (
-                <Pressable key={i} style={s.stepRow} onPress={() => toggleStep(i)} accessibilityRole="checkbox" accessibilityState={{ checked: st.done }}>
-                  <View style={[s.stepCheck, st.done && s.stepCheckDone]}>
-                    {st.done ? <Icon name="check" size={11} stroke={3.5} color={C.white} /> : null}
-                  </View>
-                  <Txt size={11.5}>{st.text}</Txt>
-                </Pressable>
-              ))}
-            </View>
-          </>
-        ) : null}
+        <View style={[s.groupTitle, s.stepsHeading]}>
+          <Txt w={700} size={14}>Steps</Txt>
+          {task.steps.length ? <Txt size={11}>{progressLabel(task.steps)}</Txt> : null}
+        </View>
+        <View style={s.stepsCard}>
+          {task.steps.map((st, i) => (
+            <Pressable key={i} style={s.stepRow} onPress={() => toggleStep(i)} accessibilityRole="checkbox" accessibilityState={{ checked: st.done }}>
+              <View style={[s.stepCheck, st.done && s.stepCheckDone]}>
+                {st.done ? <Icon name="check" size={11} stroke={3.5} color={C.white} /> : null}
+              </View>
+              <Txt size={11.5}>{st.text}</Txt>
+            </Pressable>
+          ))}
+          <Pressable style={[s.stepRow, s.breakdownLink]} onPress={openBreakdown} accessibilityRole="button">
+            <Icon name="plusCircle" size={16} stroke={1.8} color={C.green} />
+            <Txt w={700} size={11.5} color={C.green}>{task.steps.length ? 'Edit steps' : 'Break down task'}</Txt>
+          </Pressable>
+        </View>
 
         <Button
           label={task.completed ? 'Mark Incomplete' : 'Mark Complete'}
@@ -617,6 +625,30 @@ function ActiveTimerScreen({ nav, id }: TaskScreenProps) {
           <TimerControls timer={timer} mode="active" />
         </View>
       </ScrollView>
+    </Screen>
+  );
+}
+
+/* ============================== Task Breakdown screen ============================== */
+
+function TaskBreakdownScreen({ nav, id }: TaskScreenProps) {
+  const task = useTaskOrHome(id, nav);
+  if (!task) return <Screen>{null}</Screen>;
+  return (
+    <Screen>
+      <Header title="Break Down Task" onBack={nav.back} />
+      <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView style={s.flex} contentContainerStyle={[s.content, s.breakdownContent]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <TaskBreakdown
+            title={task.title}
+            initialSteps={task.steps}
+            onSave={(steps) => {
+              updateTask(task.id, { steps });
+              nav.back();
+            }}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Screen>
   );
 }
@@ -841,6 +873,9 @@ const s = StyleSheet.create({
   stepRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
   stepCheck: { width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: C.navy, alignItems: 'center', justifyContent: 'center' },
   stepCheckDone: { backgroundColor: C.green, borderColor: C.green },
+  stepsHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  breakdownLink: { gap: 6 },
+  breakdownContent: { paddingTop: 10, paddingBottom: 32 },
   completeBtn: { marginTop: 14, height: 40, borderRadius: 12 },
   detailsActions: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8, paddingHorizontal: 4, paddingBottom: 2 },
   chipBtn: { backgroundColor: C.yellowHl, paddingVertical: 5, paddingHorizontal: 18, borderRadius: 6 },
